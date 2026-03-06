@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Comma Quest — Accessible POC</title>
+<style>
+  /* ===== Design tokens ===== */
+  :root {
+    /* Neutrals */
+    --bg: #f7f9fc;
+    --card: #ffffff;
+    --text: #0b1320;      /* dark text for AAA contrast on white */
+    --muted: #3b4857;
+    --border: #e5eaf0;
+
+    /* Blues (gradient) */
+    --blue-100: #dbeeff;  /* very light */
+    --blue-600: #0f67c2;  /* dark mid */
+    --blue-700: #0c4da2;  /* darker */
+    --accent: var(--blue-600);
+
+    /* Feedback */
+    --good: #1e8e3e;  /* green with strong contrast on white */
+    --bad:  #b00020;  /* accessible error red */
+
+    /* Slot */
+    --slot: #dfe6ee;
+    --slot-hover: #c7d3df;
+
+    /* Focus */
+    --focus: #ffbf47; /* amber focus ring (high contrast on blue/white) */
+  }
+
+  /* High contrast mode (optional toggle) */
+  .hc {
+    --bg: #ffffff;
+    --card: #ffffff;
+    --text: #000000;
+    --muted: #111111;
+    --border: #000000;
+    --accent: #0b3d91; /* NASA blue for clarity */
+    --blue-100: #eaf2ff;
+    --blue-600: #0b3d91;
+    --blue-700: #062a66;
+    --good: #065f46;
+    --bad:  #990000;
+    --slot: #cbd5e1;
+    --slot-hover: #94a3b8;
+    --focus: #ffbf47;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  /* ===== Card ===== */
+  .app {
+    width: 100%;
+    max-width: 720px;
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    border: 1px solid var(--border);
+    overflow: clip;
+  }
+
+  /* ===== Header with gradient ===== */
+  header {
+    padding: 16px 20px;
+    color: white;
+    background: linear-gradient(90deg, var(--blue-100), var(--blue-600) 60%, var(--blue-700));
+  }
+  header .row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  header .brand {
+    font-weight: 800; letter-spacing: .2px; font-size: 1.1rem;
+    background: rgba(255,255,255,.16);
+    padding: 6px 10px; border-radius: 999px;
+  }
+  header .meta { display:flex; gap:16px; font-weight:700; }
+  header .meta span { display:inline-flex; align-items:center; gap:6px; }
+
+  /* Ensure text contrast (gradient is dark enough under text) */
+  header, header * { text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+
+  /* ===== Sections ===== */
+  main { padding: 16px 20px 22px; }
+
+  h1 { margin: 0 0 10px 0; font-size: 1.25rem; }
+  .muted { color: var(--muted); }
+
+  /* Progress bar (non-essential) */
+  .bar { height: 10px; background: #e6edf5; border-radius: 999px; overflow: hidden; }
+  .bar > span { display:block; height:100%; background: var(--accent); width: 100%; }
+
+  /* Buttons */
+  .btn {
+    appearance: none; border: none; cursor: pointer;
+    background: linear-gradient(90deg, var(--blue-600), var(--blue-700));
+    color: white; padding: 12px 16px; border-radius: 10px; font-weight: 800;
+    transition: filter .15s ease;
+  }
+  .btn.secondary {
+    background: #e6edf5; color: #0b1320; font-weight: 700;
+  }
+  .btn.ghost {
+    background: transparent; color: var(--text); border: 2px solid var(--border);
+  }
+  .btn:focus-visible, .slot:focus-visible, .toggle:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+  }
+  .btn:active { transform: translateY(1px); }
+
+  .controls { display:flex; gap:12px; align-items:center; flex-wrap: wrap; }
+
+  /* Sentence and slots */
+  .sentence-box {
+    margin-top: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 12px;
+    line-height: 2; font-size: 1.15rem;
+  }
+  .tokens { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .token { padding: 2px 0; }
+
+  /* Slot buttons: AAA 44x44 target size */
+  .slot {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; min-width: 44px; min-height: 44px;
+    border-radius: 50%;
+    background: var(--slot); color: #0b1320; font-weight: 900;
+    border: 2px solid transparent;
+    user-select: none;
+  }
+  .slot:hover { background: var(--slot-hover); }
+  .slot.correct { background: var(--good); color: #fff; }
+  .slot.wrong   { background: var(--bad); color: #fff; }
+
+  /* Status text */
+  .status { min-height: 24px; margin-top: 8px; font-weight: 800; }
+  .status.good { color: var(--good); }
+  .status.bad  { color: var(--bad); }
+
+  /* Layout blocks */
+  .spacer { height: 12px; }
+  .section { margin-top: 12px; }
+
+  /* Toggle row */
+  .settings { display:flex; gap: 10px; flex-wrap: wrap; align-items:center; }
+  .toggle { display:inline-flex; align-items:center; gap:8px; cursor:pointer; }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div id="root" class="app" role="application" aria-label="Comma placement game">
+  <!-- Header with gradient -->
+  <header>
+    <div class="row">
+      <div class="brand" aria-hidden="true">Comma Quest</div>
+      <div class="meta" aria-live="polite">
+        <span><span aria-hidden="true">⭐</span><strong id="score">Score: 0</strong></span>
+        <span><span aria-hidden="true">❓</span><strong id="qcount">Q: 0/10</strong></span>
+        <span><span aria-hidden="true">⏱</span><strong id="time">Timer: 60s</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <h1 id="inst">Place one comma by tapping a dot between two words — or choose <em>[No comma]</em>.</h1>
+    <p class="muted" id="srShortcuts">
+      Keyboard: <strong>1–3</strong> to place comma at a slot, <strong>0</strong> for No comma, <strong>P</strong> pause/resume, <strong>T</strong> timer on/off, <strong>+</strong> add 60s, <strong>S</strong> skip.
+    </p>
+
+    <div class="bar section" aria-hidden="true"><span id="timebar" style="width:100%"></span></div>
+
+    <!-- Start screen -->
+    <section id="start" class="section" aria-labelledby="startHeading">
+      <h2 id="startHeading" class="muted" style="margin:0 0 6px;">Developmental English & ESL • 10 questions • Optional timer</h2>
+      <div class="controls" role="group" aria-label="Start and settings">
+        <button id="startBtn" class="btn">Start</button>
+        <button id="how" class="btn ghost" aria-expanded="false" aria-controls="help">How to play</button>
+        <label class="toggle">
+          <input id="hcToggle" type="checkbox" aria-label="High contrast mode" />
+          High contrast
+        </label>
+      </div>
+      <div id="help" hidden>
+        <div class="spacer"></div>
+        <p>
+          You will see three dots between words. Pick the <strong>one</strong> correct place for a comma, or select
+          <strong>[No comma]</strong> if the sentence does not need a comma. Every item in this game is designed to be correct with
+          <strong>at most one comma</strong>.
+        </p>
+        <ul>
+          <li>Fully keyboard‑operable. Use number keys <strong>1</strong>, <strong>2</strong>, <strong>3</strong>, or <strong>0</strong> for No comma.</li>
+          <li>You may <strong>pause</strong>, <strong>add time</strong>, or turn the <strong>timer off</strong> entirely.</li>
+          <li>Feedback is shown with icons and text; color is not the only cue.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Play screen -->
+    <section id="play" class="section" style="display:none;" aria-labelledby="prompt">
+      <div class="sentence-box" role="group" aria-labelledby="prompt" aria-describedby="inst">
+        <div id="prompt" class="muted" style="margin-bottom:6px;font-weight:700;">
+          Tap a dot to place the comma, or choose [No comma].
+        </div>
+        <div id="sentence" class="tokens"></div>
+      </div>
+
+      <div class="controls" role="group" aria-label="Answer controls">
+        <button id="noComma" class="btn secondary" aria-label="No comma needed">[No comma]</button>
+        <button id="skip" class="btn secondary">Skip</button>
+        <button id="pause" class="btn secondary" aria-pressed="false" aria-label="Pause timer (P)">Pause</button>
+        <button id="plus60" class="btn secondary" aria-label="Add 60 seconds (+)">+60s</button>
+        <button id="toggleTimer" class="btn secondary" aria-pressed="true" aria-label="Turn timer off (T)">Timer: On</button>
+      </div>
+
+      <div id="feedback" class="status" aria-live="polite"></div>
+    </section>
+
+    <!-- End screen -->
+    <section id="end" class="section" style="display:none; text-align:center;" aria-live="polite">
+      <h2>Round complete</h2>
+      <p id="final"></p>
+      <p class="muted" id="summary"></p>
+      <div class="controls" style="justify-content:center">
+        <button class="btn" onclick="location.reload()">Play again</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/**
+ * Accessibility notes:
+ * - Each slot button gets an aria-label like: "Place comma between 'meeting' and 'we' (slot 2 of 3)".
+ * - Feedback uses aria-live="polite".
+ * - Timer can be paused, extended, or turned off to meet WCAG 2.1 Timing Adjustable.
+ * - Targets are >= 44px (AAA Target Size).
+ * - Keyboard shortcuts: 1-3 select slots; 0 = No comma; P pause; T timer toggle; + add 60s; S skip.
+ */
+
+/* ===== Item bank (single-comma or no-comma only; no two-comma or serial list items) ===== */
+const BANK = [
+  // 1) Introductory phrase -> single comma
+  {
+    tokens: ["After","the","meeting","we","went","for","coffee","."],
+    slots:  [1, 3, 5], // correct is meeting|we
+    correctSlot: 1,
+    explanation: "Use a comma after an introductory phrase: “After the meeting, we went for coffee.”"
+  },
+  // 2) Dependent clause first -> comma before main
+  {
+    tokens: ["Because","she","was","tired","she","went","home","early","."],
+    slots:  [1, 4, 6], // tired|she
+    correctSlot: 1,
+    explanation: "When a dependent clause comes first, add a comma before the main clause."
+  },
+  // 3) FANBOYS joining two independents -> one comma before conjunction
+  {
+    tokens: ["I","wanted","to","stay","but","I","left","early","."],
+    slots:  [2, 4, 6], // stay|but
+    correctSlot: 1,
+    explanation: "Use a comma before a coordinating conjunction joining two independent clauses."
+  },
+  // 4) Introductory adverb -> one comma
+  {
+    tokens: ["However","we","must","submit","the","assignment","today","."],
+    slots:  [1, 3, 6],
+    correctSlot: 0, // However|we
+    explanation: "Use a comma after an introductory adverb like “However,”."
+  },
+  // 5) Direct address at the beginning -> one comma
+  {
+    tokens: ["Maria","please","email","your","professor","."],
+    slots:  [1, 3, 5],
+    correctSlot: 0, // Maria|please
+    explanation: "Set off direct address with a comma: “Maria, please email your professor.”"
+  },
+  // 6) Contrast/sharp turn -> one comma
+  {
+    tokens: ["I","prefer","coffee","not","tea","."],
+    slots:  [2, 3, 4],
+    correctSlot: 2, // not|tea (comma before contrastive element)
+    explanation: "Use a comma to mark a sharp contrast: “I prefer coffee, not tea.”"
+  },
+  // 7) No comma: simple SVO
+  {
+    tokens: ["The","committee","reviewed","the","proposal","yesterday","."],
+    slots:  [1, 3, 5],
+    correctSlot: null,
+    explanation: "No comma is needed in a simple sentence with normal word order."
+  },
+  // 8) No comma: restrictive clause
+  {
+    tokens: ["Students","who","attend","regularly","earn","higher","grades","."],
+    slots:  [1, 3, 5],
+    correctSlot: null,
+    explanation: "“Who attend regularly” is essential (restrictive). Don’t add commas."
+  },
+  // 9) No comma: short final prepositional phrase
+  {
+    tokens: ["We","canceled","the","trip","because","of","the","storm","."],
+    slots:  [2, 4, 6],
+    correctSlot: null,
+    explanation: "No comma before a short, essential ending phrase like “because of the storm.”"
+  },
+  // 10) Introductory participial phrase -> one comma
+  {
+    tokens: ["Walking","through","the","rain","we","found","the","cafe","."],
+    slots:  [1, 4, 6],
+    correctSlot: 1, // ...rain|we
+    explanation: "Set off introductory participial phrases with a comma."
+  },
+  // 11) Fronted time phrase -> one comma
+  {
+    tokens: ["In","the","morning","we","will","review","the","draft","."],
+    slots:  [1, 3, 5],
+    correctSlot: 2 === 2 ? 2-1 : 1, // simply choose "morning|we" => gap index 3 => second slot index (1)
+    explanation: "Use a comma after a fronted time phrase: “In the morning, we will review the draft.”"
+  },
+  // 12) Independent, then dependent (no comma) -> to test understanding
+  {
+    tokens: ["We","will","start","the","meeting","when","everyone","arrives","."],
+    slots:  [3, 5, 7],
+    correctSlot: null,
+    explanation: "No comma before a dependent clause that follows the main clause (when it’s essential)."
+  }
+];
+
+/* ===== Config ===== */
+const ROUND_SIZE = 10;   // 10 questions per round
+const DEFAULT_TIME = 60; // default 60s (can be turned off or extended)
+
+/* ===== State ===== */
+let score = 0;
+let qIndex = 0;
+let timeLeft = DEFAULT_TIME;
+let timerId = null;
+let timerOn = true;
+let paused = false;
+let sequence = [];
+let currentItem = null;
+
+/* ===== Elements ===== */
+const elRoot = document.getElementById('root');
+const elStart = document.getElementById('start');
+const elPlay  = document.getElementById('play');
+const elEnd   = document.getElementById('end');
+
+const elScore = document.getElementById('score');
+const elQCount = document.getElementById('qcount');
+const elTime = document.getElementById('time');
+const elTimeBar = document.getElementById('timebar');
+
+const elSentence = document.getElementById('sentence');
+const elFeedback = document.getElementById('feedback');
+
+const btnStart = document.getElementById('startBtn');
+const btnHow = document.getElementById('how');
+const help = document.getElementById('help');
+const hcToggle = document.getElementById('hcToggle');
+
+const btnNoComma = document.getElementById('noComma');
+const btnSkip = document.getElementById('skip');
+const btnPause = document.getElementById('pause');
+const btnPlus = document.getElementById('plus60');
+const btnTimerToggle = document.getElementById('toggleTimer');
+
+/* ===== Event wiring ===== */
+btnStart.addEventListener('click', start);
+btnHow.addEventListener('click', () => {
+  const expanded = btnHow.getAttribute('aria-expanded') === 'true';
+  btnHow.setAttribute('aria-expanded', String(!expanded));
+  help.hidden = expanded;
+});
+hcToggle.addEventListener('change', e => {
+  if (e.target.checked) elRoot.classList.add('hc');
+  else elRoot.classList.remove('hc');
+});
+
+btnNoComma.addEventListener('click', () => submitAnswer('none'));
+btnSkip.addEventListener('click', () => nextQuestion());
+
+btnPause.addEventListener('click', () => {
+  paused = !paused;
+  btnPause.setAttribute('aria-pressed', String(paused));
+  btnPause.textContent = paused ? 'Resume' : 'Pause';
+});
+
+btnPlus.addEventListener('click', () => {
+  if (!timerOn) return; // no need if timer disabled
+  timeLeft += 60;
+  updateTimeUI();
+});
+
+btnTimerToggle.addEventListener('click', toggleTimer);
+
+/* Keyboard shortcuts */
+document.addEventListener('keydown', (e) => {
+  const key = e.key;
+  if (document.getElementById('play').style.display === 'none') return;
+
+  if (key === '1' || key === '2' || key === '3') {
+    submitAnswer(Number(key) - 1);
+  } else if (key === '0') {
+    submitAnswer('none');
+  } else if (key === 'p' || key === 'P') {
+    btnPause.click();
+  } else if (key === 't' || key === 'T') {
+    toggleTimer();
+  } else if (key === '+') {
+    btnPlus.click();
+  } else if (key === 's' || key === 'S') {
+    btnSkip.click();
+  }
+});
+
+/* ===== Game flow ===== */
+function start() {
+  // Initialize
+  score = 0; qIndex = 0; paused = false; timerOn = true;
+  timeLeft = DEFAULT_TIME;
+  updateScoreUI();
+  updateQCountUI();
+  updateTimeUI();
+
+  sequence = shuffle([...Array(BANK.length).keys()]).slice(0, ROUND_SIZE);
+
+  elStart.style.display = 'none';
+  elEnd.style.display = 'none';
+  elPlay.style.display = '';
+
+  // Start timer
+  if (timerId) clearInterval(timerId);
+  timerId = setInterval(tick, 1000);
+
+  nextQuestion();
+}
+
+function end() {
+  clearInterval(timerId);
+  elPlay.style.display = 'none';
+  elEnd.style.display = '';
+  const answered = qIndex;
+  const accuracy = answered ? Math.round((score / answered) * 100) : 0;
+  document.getElementById('final').textContent = `You scored ${score} out of ${answered}.`;
+  document.getElementById('summary').textContent =
+    `Accuracy: ${accuracy}% • ${timerOn ? `Time used: ${DEFAULT_TIME - timeLeft}s` : 'Timer was off'}`;
+}
+
+function nextQuestion() {
+  if (qIndex >= ROUND_SIZE) { end(); return; }
+  const bankIdx = sequence[qIndex];
+  currentItem = BANK[bankIdx];
+  qIndex++;
+  updateQCountUI();
+  renderSentence(currentItem);
+  announceInstruction();
+  clearFeedback();
+}
+
+function tick() {
+  if (!timerOn || paused) return;
+  timeLeft--;
+  if (timeLeft <= 0) {
+    timeLeft = 0; updateTimeUI(); end(); return;
+  }
+  updateTimeUI();
+}
+
+function updateScoreUI() {
+  elScore.textContent = `Score: ${score}`;
+}
+function updateQCountUI() {
+  elQCount.textContent = `Q: ${qIndex}/${ROUND_SIZE}`;
+}
+function updateTimeUI() {
+  elTime.textContent = timerOn ? `Timer: ${timeLeft}s` : `Timer: Off`;
+  elTimeBar.style.width = timerOn ? `${(timeLeft / DEFAULT_TIME) * 100}%` : '0%';
+}
+
+/* Timer toggle (for WCAG 2.1 Timing Adjustable / AAA No Timing option) */
+function toggleTimer() {
+  timerOn = !timerOn;
+  btnTimerToggle.setAttribute('aria-pressed', String(timerOn));
+  btnTimerToggle.textContent = `Timer: ${timerOn ? 'On' : 'Off'}`;
+  updateTimeUI();
+}
+
+/* ===== Rendering ===== */
+function renderSentence(item) {
+  elSentence.innerHTML = '';
+  // Build lookup gap index -> slot ordinal
+  const slotMap = new Map();
+  item.slots.forEach((gapIndex, k) => slotMap.set(gapIndex, k));
+
+  // Build sequence of token + (optional slot) buttons
+  for (let i = 0; i < item.tokens.length; i++) {
+    const t = document.createElement('span');
+    t.className = 'token';
+    t.textContent = item.tokens[i];
+    elSentence.appendChild(t);
+
+    const gapIndex = i + 1;
+    if (slotMap.has(gapIndex)) {
+      const k = slotMap.get(gapIndex); // 0..2
+      const slot = document.createElement('button');
+      slot.className = 'slot';
+      slot.type = 'button';
+      const left = item.tokens[i];
+      const right = item.tokens[i+1] || '';
+      slot.setAttribute('aria-label', `Place comma between “${left}” and “${right}” (slot ${k+1} of 3)`);
+      slot.textContent = '•';
+      slot.addEventListener('click', () => submitAnswer(k));
+      elSentence.appendChild(slot);
+    }
+  }
+
+  // Ensure the first interactive control is focusable for keyboard users
+  const firstSlot = elSentence.querySelector('.slot');
+  if (firstSlot) firstSlot.focus();
+}
+
+/* ===== Answer handling ===== */
+function submitAnswer(selection) {
+  // selection: 'none' or 0..2
+  let correct = false;
+  const expected = currentItem.correctSlot; // null or 0..2
+
+  if (selection === 'none') {
+    correct = (expected === null);
+  } else {
+    correct = (expected === selection);
+  }
+
+  // Visual feedback on selected slot (if any)
+  if (selection !== 'none') {
+    const slotButtons = [...elSentence.querySelectorAll('.slot')];
+    const btn = slotButtons[selection];
+    if (btn) btn.classList.add(correct ? 'correct' : 'wrong');
+  }
+
+  // Update score + feedback text (non-color cue)
+  if (correct) {
+    score++; updateScoreUI();
+    showFeedback('✔ Correct', true);
+  } else {
+    showFeedback(`✖ ${currentItem.explanation}`, false);
+  }
+
+  // After short delay, move on (respect pause/end)
+  disableSlots();
+  setTimeout(() => {
+    if (!timerOn && qIndex >= ROUND_SIZE) { end(); return; }
+    if (timeLeft === 0) { end(); return; }
+    nextQuestion();
+  }, 750);
+}
+
+function disableSlots() {
+  const buttons = elSentence.querySelectorAll('.slot');
+  buttons.forEach(b => b.disabled = true);
+}
+
+function clearFeedback() {
+  elFeedback.textContent = '';
+  elFeedback.className = 'status';
+}
+
+function showFeedback(msg, good) {
+  elFeedback.textContent = msg;
+  elFeedback.className = 'status ' + (good ? 'good' : 'bad');
+}
+
+function announceInstruction() {
+  // Re-announce prompt for screen readers on each question
+  const prompt = document.getElementById('prompt');
+  prompt.textContent = 'Tap a dot to place the comma, or choose [No comma].';
+}
+
+/* ===== Utilities ===== */
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+</script>
+</body>
+</html>
